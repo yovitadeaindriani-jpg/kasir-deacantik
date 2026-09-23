@@ -21,23 +21,54 @@ for item in products:
 
 print()
 
-print("--- Minggu 01 vs Minggu 02 ---")
+print("--- Masalah Minggu 02 ---") 
 
-# Minggu 01 — dictionary.
-product_dict = {"code": "P001", "name": "Indomie", "price": 3000, "stock": 20}
-print("dictionary :", product_dict["name"], "subtotal",
-      product_dict["price"] * 2)
+indomie = products[0] 
 
-# Minggu 02 — object. Rumus subtotal tidak lagi ditulis ulang di sini.
-print("object     :", product.name, "subtotal", product.subtotal(2))
+# Di Minggu 02 baris ini mengubah harga menjadi negatif tanpa perlawanan. 
+# Sekarang price hanya bisa dibaca, tidak bisa ditulis. 
+try:
+    indomie.price = -5000
+except ValueError as e:
+    print("Error:", e)
 
-print()
-print("--- Catatan untuk Minggu 03 ---")
+print() 
+print("--- Perubahan lewat method ---") 
 
-# Satu masalah Minggu 01 sudah selesai: perilaku kini menyatu dengan data.
-# Tetapi datanya masih belum terjaga.
-products[0].price = -5000
-products[0].stock = -100
-print("Harga sekarang:", products[0].price, "(negatif, masih diterima)")
-print("Stock sekarang:", products[0].stock, "(negatif, masih diterima)")
-print("Belum ada yang menjaga aturan ini -> encapsulation di Minggu 03.")
+indomie.change_price(3500) 
+print("Harga baru:", indomie.price) 
+
+indomie.reduce_stock(5) 
+print("Stock setelah terjual 5:", indomie.stock)
+
+print() 
+print("--- Setiap aturan diuji ---")
+
+try: 
+    indomie.change_price(-5000)
+except ValueError as error: 
+    print("change_price(-5000) ->", error) 
+
+try: 
+    indomie.reduce_stock(0) 
+except ValueError as error: 
+    print("reduce_stock(0) ->", error) 
+
+try: 
+    indomie.reduce_stock(-3) 
+except ValueError as error: 
+    print("reduce_stock(-3) ->", error) 
+
+try: 
+    indomie.reduce_stock(999)
+except ValueError as error: 
+    print("reduce_stock(999) ->", error)
+    
+try: 
+    indomie.reduce_stock(999)
+except ValueError as error: 
+    print("reduce_stock(999) ->", error) 
+
+print() 
+print("Harga akhir:", indomie.price, "| Stock akhir:", indomie.stock) 
+print("Percobaan yang gagal tidak mengubah apa pun.")
