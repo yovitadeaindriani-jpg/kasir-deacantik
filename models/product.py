@@ -1,3 +1,4 @@
+
 class Product:
     def __init__(self, code, name, price, stock):
         self.code = code
@@ -33,9 +34,15 @@ class Product:
             raise ValueError("Insufficient stock")
 
         self._stock -= quantity
-        
+
+    def get_description(self):
+        # Perilaku dasar. Subclass boleh menggantinya (override).
+        return self.name
+
     @price.setter
-    def price (self, value):
+    def price(self, value):
         if value < 0:
-            raise ValueError ("Tidak boleh kurang dari 0")
-        self ._price = value
+            raise ValueError("Tidak boleh kurang dari 0")
+
+        self._price = value
+
