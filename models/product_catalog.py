@@ -23,4 +23,14 @@ class ProductCatalog:
     def all(self):
        # List, karena untuk ditampilkan yang penting urutannya.
        return list(self.products.values())
-   
+    def search(self, keyword):
+       """Cari produk berdasarkan potongan nama, tanpa peduli huruf besar/kecil.
+       Hasilnya list karena pencarian bisa mengembalikan
+       nol, satu, atau banyak produk sekaligus.
+       """
+       keyword = keyword.lower()
+       results = []
+       for product in self.products.values():
+           if keyword in product.name.lower():
+            results.append(product)
+       return results
