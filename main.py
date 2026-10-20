@@ -1,65 +1,83 @@
-from models.product import Product
-from models.food_product import FoodProduct
-from models.digital_product import DigitalProduct
+"""Simple Cashier — Minggu 07 (File Handling & Persistence).
 
-products = [
-    Product("P001", "Indomie", 3000, 20),
-    FoodProduct("F001", "Roti", 7000, 8, "2026-12-01"),
-    DigitalProduct("D001", "E-Book Python", 50000, 99),
-]
+Produk tidak lagi ditulis di dalam kode.
+Data dibaca dari data/products.csv saat program mulai,
+dan ditulis kembali saat ada perubahan.
+"""
 
+from models.product_catalog import ProductCatalog
+from repositories.order_repository import OrderRepository
+from repositories.product_repository import ProductRepository
+from services.action_history import ActionHistory
+from services.order_queue import OrderQueue
+
+PRODUCTS_PATH = "data/products.csv"
+ORDERS_PATH = "data/orders.json"
+
+product_repository = ProductRepository(PRODUCTS_PATH)
+order_repository = OrderRepository(ORDERS_PATH)
 
 print("=========================")
 print("     SIMPLE CASHIER")
 print("=========================")
 print()
 
-print("--- Polymorphism ---")
+print("--- Muat produk dari CSV ---")
 
-# Satu list berisi tiga jenis object,
-# satu loop, tiga hasil berbeda.
-# main.py tidak perlu tahu jenis produknya.
+catalog = ProductCatalog()
 
-for item in products:
-    print(item.code, "|", item.get_description())
+for product in product_repository.load():
+    catalog.add(product)
 
-print()
-
-print("--- Yang diwarisi dari Product ---")
-
-roti = products[1]
-
-# subtotal() tidak ditulis ulang di FoodProduct,
-# tetapi tetap bisa dipakai.
-print("Subtotal 3 Roti:", roti.subtotal(3))
-
-# expiry_date hanya dimiliki FoodProduct.
-print("Kedaluwarsa Roti:", roti.expiry_date)
-
+for item in catalog.all():
+    print(item.code, "|", item.name, "| harga", item.price, "| stock", item.stock)
 
 print()
+print("--- File tidak ada ---")
 
-print("--- Encapsulation Minggu 03 tetap berlaku di subclass ---")
-
-try:
-    roti.price = 1
-except AttributeError:
-    print("FoodProduct.price tetap read-only.")
-
-try:
-    roti.change_price(-1000)
-except ValueError as error:
-    print("FoodProduct.change_price(-1000) ->", error)
-
-try:
-    roti.reduce_stock(999)
-except ValueError as error:
-    print("FoodProduct.reduce_stock(999) ->", error)
-
-roti.reduce_stock(3)
-print("Stock Roti setelah terjual 3:", roti.stock)
+kosong = ProductRepository("data/tidak_ada.csv")
+print("load() ->", kosong.load(), "(FileNotFoundError ditangani)")
 
 print()
+print("--- Transaksi lalu simpan ---")
 
-print("Aturan ditulis sekali di Product, dipakai semua turunannya.")
+indomie = catalog.get("P001")
+history = ActionHistory()
+queue = OrderQueue()
 
+orders = order_repository.load()
+jumlah = 3
+
+print("Stock Indomie sebelum:", indomie.stock)
+
+# Penjualan hanya diproses jika stok masih mencukupi.
+if indomie.stock >= jumlah:
+    indomie.reduce_stock(jumlah)
+    history.push(f"jual Indomie x{jumlah}")
+
+    queue.enqueue(f"ORD-{len(orders) + 1:03d} Indomie x{jumlah}")
+    orders.append(queue.dequeue())
+
+    product_repository.save(catalog.all())
+    order_repository.save(orders)
+
+    print("Stock Indomie sesudah:", indomie.stock)
+    print("Perubahan ditulis ke", PRODUCTS_PATH, "dan", ORDERS_PATH)
+else:
+    print("Stock Indomie tinggal", indomie.stock, "- penjualan dilewati.")
+    print("Isi ulang stock di", PRODUCTS_PATH, "untuk mencoba lagi.")
+
+print()
+print("--- Baca ulang dari file ---")
+
+# Membaca ulang data seolah-olah program baru dijalankan.
+segar = ProductRepository(PRODUCTS_PATH).load()
+indomie_lagi = [p for p in segar if p.code == "P001"][0]
+
+print("Stock Indomie setelah dibaca ulang:", indomie_lagi.stock)
+print("Order tersimpan:", OrderRepository(ORDERS_PATH).load())
+
+print()
+print("--- Mengapa CSV dan JSON? ---")
+print("Produk berbentuk tabel datar         -> CSV.")
+print("Order berisi daftar item di dalamnya -> JSON.")
