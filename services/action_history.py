@@ -1,4 +1,3 @@
-
 class ActionHistory:
     def __init__(self):
         self.actions = []
@@ -6,10 +5,7 @@ class ActionHistory:
     def push(self, action):
         self.actions.append(action)
 
-    def undo(self):
-        if self.actions:
-            return self.actions.pop()
-        return None
-
-    def all(self):
-        return self.actions.copy()
+    def pop(self):
+        if not self.actions:
+            return None
+        return self.actions.pop()
