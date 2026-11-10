@@ -1,59 +1,66 @@
+"""ProductRepository — Minggu 09 (SQLite).
 
-import csv
-from pathlib import Path
+Sumber datanya berganti dari CSV menjadi database.
+Interface load() dan save() sengaja tidak berubah, sehingga
+Product, ProductCatalog, dan seluruh service tidak perlu disentuh.
+"""
+
+import sqlite3
 
 from models.product import Product
-from models.food_product import FoodProduct
-from models.digital_product import DigitalProduct
+from repositories.database import DATABASE_PATH, get_connection
 
 
 class ProductRepository:
-    def __init__(self, path):
-        self.path = Path(path)
-
+    def __init__(self, path=DATABASE_PATH):
+        self.path = path
+        
     def load(self):
         products = []
-
-        if not self.path.exists():
-            return products
-
-        with open(self.path, "r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-
-            for row in reader:
-                code = row["code"]
-                name = row["name"]
-                price = int(row["price"])
-                stock = int(row["stock"])
-
-                if code.startswith("F"):
-                    expiry_date = row.get("expiry_date", "")
-                    product = FoodProduct(
-                        code, name, price, stock, expiry_date
-                    )
-                elif code.startswith("D"):
-                    product = DigitalProduct(code, name, price, stock)
-                else:
-                    product = Product(code, name, price, stock)
-
-                products.append(product)
-
+        
+        try:
+            with get_connection(self.path) as connection:
+                rows = connection.execute(
+                    "SELECT code, name, price, stock FROM products"
+                ).fetchall()
+        except sqlite3.OperationalError:
+            # Tabel belum ada. Sama semangatnya dengan FileNotFoundError
+            # di Minggu 07: program tetap jalan dengan data kosong.
+            return []
+        
+        for row in rows:
+            # Kolom INTEGER sudah bertipe int, tidak perlu int() manual
+            # seperti pada csv.DictReader.
+            products.append(
+                Product(row["code"], row["name"], row["price"], row["stock"])
+            )
         return products
 
     def save(self, products):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(self.path, "w", newline="", encoding="utf-8") as file:
-            fieldnames = ["code", "name", "price", "stock", "expiry_date"]
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-
-            writer.writeheader()
-
+        with get_connection(self.path) as connection:
             for product in products:
-                writer.writerow({
-                    "code": product.code,
-                    "name": product.name,
-                    "price": product.price,
-                    "stock": product.stock,
-                    "expiry_date": getattr(product, "expiry_date", "")
-                })
+                # Tanda ? adalah parameterized query.
+                # Nilai dikirim terpisah dari perintah SQL-nya,
+                # sehingga isi data tidak pernah dibaca sebagai perintah.
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO products (code, name, price, stock)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (product.code, product.name, product.price, product.stock),
+                )
+                
+    def get(self, code):
+        """Ambil satu produk langsung dari database.
+        Di Minggu 07 ini berarti membaca seluruh file lebih dulu.
+        """
+        
+        with get_connection(self.path) as connection:
+            row = connection.execute(
+                "SELECT code, name, price, stock FROM products WHERE code = ?",
+                (code,),
+                ).fetchone()
+            
+        if row is None:
+            return None
+        return Product(row["code"], row["name"], row["price"], row["stock"])

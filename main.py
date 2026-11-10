@@ -1,109 +1,204 @@
-"""Simple Cashier — Minggu 07 (File Handling & Persistence).
 
-Produk tidak lagi ditulis di dalam kode.
-Data dibaca dari data/products.csv saat program mulai,
-dan ditulis kembali saat ada perubahan.
+"""Simple Cashier — Minggu 09 (SQLite).
+
+Data produk dibaca dari database SQLite.
+Perubahan stok dan transaksi disimpan ke database.
 """
 
 from models.product_catalog import ProductCatalog
 from repositories.order_repository import OrderRepository
 from repositories.product_repository import ProductRepository
+from repositories.database import DATABASE_PATH, create_schema
 from services.action_history import ActionHistory
 from services.order_queue import OrderQueue
-from models.product import Product
-from models.food_product import FoodProduct
-from models.digital_product import DigitalProduct
+from models.product import Product  # PERBAIKAN: untuk data awal produk
 
-PRODUCTS_PATH = "data/products.csv"
-ORDERS_PATH = "data/orders.json"
+
 def judul(teks):
     print()
     print("---", teks, "---")
-    
+
+
 print("=========================")
-print(" SIMPLE CASHIER")
-print(" UTS Checkpoint W01-07")
+print("SIMPLE CASHIER")
 print("=========================")
 
 # ------------------------------------------------------------------
-# Minggu 02-03 — Class, Object, Encapsulation
+# Minggu 09 — Persiapan database
 # ------------------------------------------------------------------
-judul("W02-03 Class, Object, Encapsulation")
-contoh = Product("P000", "Contoh", 3000, 20)
-print("subtotal(2) :", contoh.subtotal(2))
-try:
-    contoh.price = -5000
-except ValueError as e:
-    print("Error:", e)
-    
-try:
-    contoh.change_price(-5000)
-except ValueError as error:
-    print("change_price(-1) :", error)
-    
-try:
-    contoh.reduce_stock(999)
-except ValueError as error:
-    print("reduce_stock(999):", error)
+
+create_schema()
+
+product_repository = ProductRepository()
+order_repository = OrderRepository()
+
+history = ActionHistory()
+queue = OrderQueue()
+
+# PERBAIKAN: Isi database dengan produk awal jika masih kosong.
+# Data tidak dimasukkan ulang jika database sudah memiliki produk.
+
+if len(product_repository.load()) == 0:
+    produk_awal = [
+        Product("P001", "Indomie", 3000, 20),
+        Product("P002", "Teh Botol", 4000, 15),
+        Product("P003", "Teh Kotak", 3500, 10),
+        Product("P004", "Roti", 7000, 8),
+    ]
+
+    product_repository.save(produk_awal)
 
 # ------------------------------------------------------------------
-# Minggu 04 — Inheritance & Polymorphism
+# Muat produk dari database
 # ------------------------------------------------------------------
-judul("W04 Inheritance & Polymorphism")
 
-varian = [
-    Product("P001", "Indomie", 3000, 20),
-    FoodProduct("F001", "Roti", 7000, 8, "2026-12-01"),
-    DigitalProduct("D001", "E-Book Python", 50000, 99),
-]
+judul("Muat produk dari database")
 
-# Satu loop, tiga hasil berbeda, tanpa memeriksa jenis produk.
-for item in varian:
-    print(f"{item.code:5} {item.get_description()}")
-# ------------------------------------------------------------------
-# Minggu 07 — Repository & File (memuat data nyata)
-# ------------------------------------------------------------------
-judul("W07 Repository & File")
-
-product_repository = ProductRepository(PRODUCTS_PATH)
-order_repository = OrderRepository(ORDERS_PATH)
+products = product_repository.load()
 
 catalog = ProductCatalog()
 
-for product in product_repository.load():
+for product in products:
     catalog.add(product)
-    
-print("Dimuat dari", PRODUCTS_PATH, ":", len(catalog.all()), "produk")
-print("File tidak ada :", ProductRepository("data/hilang.csv").load())
+
+print("Sumber data:", DATABASE_PATH)
+
+for product in catalog.all():
+    print(
+        product.code,
+        product.name,
+        product.price,
+        "stock",
+        product.stock
+    )
 
 # ------------------------------------------------------------------
-# Minggu 05 — List & Dictionary
+# Ambil satu produk: file vs database
 # ------------------------------------------------------------------
-judul("W05 Catalog: List & Dictionary")
 
-for item in catalog.all():
-    print(f"{item.code:5} {item.name:12} {item.price:>6} stock {item.stock}")
-    
-print()
-print("get('P001') :", catalog.get("P001").name, "(dictionary, satu langkah)")
-print("get('P999') :", catalog.get("P999"), "(tidak error)")
-print("search('teh') :", [p.name for p in catalog.search("teh")])
-print("search('TEH') :", [p.name for p in catalog.search("TEH")])
-print("search('kopi') :", catalog.search("kopi"), "(tidak ditemukan)")
+judul("Ambil satu produk: file vs database")
+
+produk = product_repository.get("P001")
+produk_tidak_ada = product_repository.get("P999")
+
+print(
+    "repository.get('P001') :",
+    produk.name if produk else None
+)
+
+print(
+    "repository.get('P999') :",
+    produk_tidak_ada
+)
 
 # ------------------------------------------------------------------
-# Minggu 06 — Stack & Queue
+# Struktur data Minggu 05-06 tetap dipakai
 # ------------------------------------------------------------------
-judul("W06 Queue (FIFO) vs Stack (LIFO)")
 
-queue = OrderQueue()
-history = ActionHistory()
+judul("Struktur data Minggu 05-06 tetap dipakai")
 
-for penanda in ["A", "B", "C"]:
-    queue.enqueue(penanda)
-    history.push(penanda)
-    
-print("Masuk : A B C")
-print("Queue keluar :", queue.dequeue(), queue.dequeue(), queue.dequeue(), "(FIFO)")
-print("Stack keluar :", history.actions.pop(), history.actions.pop(), history.actions.pop(), "(LIFO)")
-print("Queue kosong :", queue.dequeue(), "| Stack kosong:", history.pop())
+# PERBAIKAN: Cek produk sebelum mengambil atribut name.
+produk_teh = catalog.get("P002")
+
+if produk_teh is not None:
+    print("catalog.get('P002') :", produk_teh.name)
+else:
+    print("Produk P002 tidak ditemukan.")
+
+hasil_cari = [
+    product.name
+    for product in catalog.search("teh")
+]
+
+print("catalog.search('teh') :", hasil_cari)
+
+# ------------------------------------------------------------------
+# Transaksi lalu simpan ke database
+# ------------------------------------------------------------------
+
+judul("Transaksi lalu simpan ke database")
+
+indomie = catalog.get("P001")
+jumlah = 3
+
+if indomie is not None:
+    print("Stock Indomie sebelum :", indomie.stock)
+
+    if indomie.stock >= jumlah:
+
+        # Aturan bisnis tetap dijaga model, bukan oleh SQL.
+        indomie.reduce_stock(jumlah)
+
+        history.push(f"jual Indomie x{jumlah}")
+
+        order = {
+            "order_id": order_repository.next_order_id(),
+            "total": indomie.subtotal(jumlah),
+            "status": "QUEUED",
+            "items": [
+                {
+                    "code": indomie.code,
+                    "quantity": jumlah
+                }
+            ],
+        }
+
+        queue.enqueue(order)
+
+        order_repository.save(queue.dequeue())
+
+        product_repository.save(catalog.all())
+
+        print("Stock Indomie sesudah :", indomie.stock)
+
+        print(
+            "Order tersimpan :",
+            order["order_id"],
+            "total",
+            order["total"]
+        )
+
+    else:
+        print("Stock tidak cukup - penjualan dilewati.")
+
+else:
+    print("Produk Indomie tidak ditemukan.")
+
+# ------------------------------------------------------------------
+# Baca ulang dari koneksi baru
+# ------------------------------------------------------------------
+
+judul("Baca ulang dari koneksi baru")
+
+segar = ProductRepository().get("P001")
+
+# PERBAIKAN: Cek agar tidak error jika produk tidak ditemukan.
+if segar is not None:
+    print("Stock Indomie di database :", segar.stock)
+else:
+    print("Stock Indomie di database : Produk tidak ditemukan.")
+
+orders = OrderRepository().load()
+
+print("Jumlah order tersimpan :", len(orders))
+
+if orders:
+    terakhir = orders[-1]
+
+    print(
+        "Order terakhir :",
+        terakhir["order_id"],
+        terakhir["status"],
+        "dengan",
+        len(terakhir["items"]),
+        "item"
+    )
+
+# ------------------------------------------------------------------
+# Yang berubah dan yang tetap
+# ------------------------------------------------------------------
+
+judul("Yang berubah dan yang tetap")
+
+print("Berubah : repositories/ (CSV/JSON -> SQL)")
+print("Tetap : models/, services/ - tidak satu baris pun disentuh")
