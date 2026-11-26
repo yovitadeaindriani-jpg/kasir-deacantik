@@ -1,10 +1,3 @@
-
-"""Simple Cashier — Minggu 09 (SQLite).
-
-Data produk dibaca dari database SQLite.
-Perubahan stok dan transaksi disimpan ke database.
-"""
-
 from models.product_catalog import ProductCatalog
 from repositories.order_repository import OrderRepository
 from repositories.product_repository import ProductRepository
@@ -19,186 +12,136 @@ def judul(teks):
     print("---", teks, "---")
 
 
-print("=========================")
-print("SIMPLE CASHIER")
-print("=========================")
+MENU = """
+=========================
+    SIMPLE CASHIER
+=========================
 
-# ------------------------------------------------------------------
-# Minggu 09 — Persiapan database
-# ------------------------------------------------------------------
+1. Product List
+2. Search Product
+3. Add to Cart
+4. View Cart
+5. Checkout
+6. Order Queue
+0. Exit
+"""
 
-create_schema()
 
-product_repository = ProductRepository()
-order_repository = OrderRepository()
+BELUM_TERSEDIA = "Belum tersedia. Menu ini diaktifkan pada Minggu 11."
 
-history = ActionHistory()
-queue = OrderQueue()
 
-# PERBAIKAN: Isi database dengan produk awal jika masih kosong.
-# Data tidak dimasukkan ulang jika database sudah memiliki produk.
+def show_menu():
+    print(MENU)
 
-if len(product_repository.load()) == 0:
-    produk_awal = [
-        Product("P001", "Indomie", 3000, 20),
-        Product("P002", "Teh Botol", 4000, 15),
-        Product("P003", "Teh Kotak", 3500, 10),
-        Product("P004", "Roti", 7000, 8),
-    ]
 
-    product_repository.save(produk_awal)
+def format_product(product):
+    return f"{product.code:6} {product.name:15} {product.price:>7} {product.stock:>6}"
 
-# ------------------------------------------------------------------
-# Muat produk dari database
-# ------------------------------------------------------------------
 
-judul("Muat produk dari database")
+def show_header():
+    print(f"{'CODE':6} {'NAME':15} {'PRICE':>7} {'STOCK':>6}")
+    print("-" * 37)
 
-products = product_repository.load()
 
-catalog = ProductCatalog()
+def show_products(catalog):
+    products = catalog.all()
 
-for product in products:
-    catalog.add(product)
+    if not products:
+        print("Katalog kosong.")
+        return
 
-print("Sumber data:", DATABASE_PATH)
+    show_header()
 
-for product in catalog.all():
-    print(
-        product.code,
-        product.name,
-        product.price,
-        "stock",
-        product.stock
-    )
+    for product in products:
+        print(format_product(product))
 
-# ------------------------------------------------------------------
-# Ambil satu produk: file vs database
-# ------------------------------------------------------------------
 
-judul("Ambil satu produk: file vs database")
+def search_product(catalog):
+    keyword = input("Kata kunci: ").strip()
 
-produk = product_repository.get("P001")
-produk_tidak_ada = product_repository.get("P999")
+    if not keyword:
+        print("Kata kunci kosong.")
+        return
 
-print(
-    "repository.get('P001') :",
-    produk.name if produk else None
-)
+    results = catalog.search(keyword)
 
-print(
-    "repository.get('P999') :",
-    produk_tidak_ada
-)
+    if not results:
+        print(f"Tidak ada produk yang cocok dengan '{keyword}'.")
+        return
 
-# ------------------------------------------------------------------
-# Struktur data Minggu 05-06 tetap dipakai
-# ------------------------------------------------------------------
+    show_header()
 
-judul("Struktur data Minggu 05-06 tetap dipakai")
+    for product in results:
+        print(format_product(product))
 
-# PERBAIKAN: Cek produk sebelum mengambil atribut name.
-produk_teh = catalog.get("P002")
 
-if produk_teh is not None:
-    print("catalog.get('P002') :", produk_teh.name)
-else:
-    print("Produk P002 tidak ditemukan.")
+def show_order_queue(order_repository):
+    orders = order_repository.load()
 
-hasil_cari = [
-    product.name
-    for product in catalog.search("teh")
-]
+    if not orders:
+        print("Belum ada order dalam antrean.")
+        return
 
-print("catalog.search('teh') :", hasil_cari)
-
-# ------------------------------------------------------------------
-# Transaksi lalu simpan ke database
-# ------------------------------------------------------------------
-
-judul("Transaksi lalu simpan ke database")
-
-indomie = catalog.get("P001")
-jumlah = 3
-
-if indomie is not None:
-    print("Stock Indomie sebelum :", indomie.stock)
-
-    if indomie.stock >= jumlah:
-
-        # Aturan bisnis tetap dijaga model, bukan oleh SQL.
-        indomie.reduce_stock(jumlah)
-
-        history.push(f"jual Indomie x{jumlah}")
-
-        order = {
-            "order_id": order_repository.next_order_id(),
-            "total": indomie.subtotal(jumlah),
-            "status": "QUEUED",
-            "items": [
-                {
-                    "code": indomie.code,
-                    "quantity": jumlah
-                }
-            ],
-        }
-
-        queue.enqueue(order)
-
-        order_repository.save(queue.dequeue())
-
-        product_repository.save(catalog.all())
-
-        print("Stock Indomie sesudah :", indomie.stock)
-
+    for order in orders:
+        jumlah_item = len(order["items"])
         print(
-            "Order tersimpan :",
-            order["order_id"],
-            "total",
-            order["total"]
+            f"{order['order_id']:10} {order['status']:8} "
+            f"total {order['total']:>7} {jumlah_item} item"
         )
 
-    else:
-        print("Stock tidak cukup - penjualan dilewati.")
+    print(f"\n{len(orders)} order.")
 
-else:
-    print("Produk Indomie tidak ditemukan.")
 
-# ------------------------------------------------------------------
-# Baca ulang dari koneksi baru
-# ------------------------------------------------------------------
+def load_catalog(product_repository):
+    catalog = ProductCatalog()
 
-judul("Baca ulang dari koneksi baru")
+    # Memasukkan produk dari database ke dalam katalog
+    for product in product_repository.load():
+        catalog.add(product)
 
-segar = ProductRepository().get("P001")
+    return catalog
 
-# PERBAIKAN: Cek agar tidak error jika produk tidak ditemukan.
-if segar is not None:
-    print("Stock Indomie di database :", segar.stock)
-else:
-    print("Stock Indomie di database : Produk tidak ditemukan.")
 
-orders = OrderRepository().load()
+def main():
+    product_repository = ProductRepository()
+    order_repository = OrderRepository()
 
-print("Jumlah order tersimpan :", len(orders))
+    catalog = load_catalog(product_repository)
 
-if orders:
-    terakhir = orders[-1]
+    if not catalog.all():
+        print("Database kosong atau belum dibuat.")
+        print("Jalankan lebih dulu: python -m scripts.init_db")
+        return
 
-    print(
-        "Order terakhir :",
-        terakhir["order_id"],
-        terakhir["status"],
-        "dengan",
-        len(terakhir["items"]),
-        "item"
-    )
+    while True:
+        show_menu()
 
-# ------------------------------------------------------------------
-# Yang berubah dan yang tetap
-# ------------------------------------------------------------------
+        try:
+            choice = input("Choose: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            # Ctrl+D atau Ctrl+C tetap keluar dengan rapi.
+            print("\nSampai jumpa.")
+            return
 
-judul("Yang berubah dan yang tetap")
+        if choice == "1":
+            show_products(catalog)
 
-print("Berubah : repositories/ (CSV/JSON -> SQL)")
-print("Tetap : models/, services/ - tidak satu baris pun disentuh")
+        elif choice == "2":
+            search_product(catalog)
+
+        elif choice in ("3", "4", "5"):
+            print(BELUM_TERSEDIA)
+
+        elif choice == "6":
+            show_order_queue(order_repository)
+
+        elif choice == "0":
+            print("Sampai jumpa.")
+            return
+
+        else:
+            print(f"Pilihan '{choice}' tidak dikenal. Masukkan angka 0-6.")
+
+
+if __name__ == "__main__":
+    main()
