@@ -23,5 +23,5 @@ CREATE TABLE IF NOT EXISTS order_items (
     order_id TEXT NOT NULL,
     code TEXT NOT NULL,
     quantity INTEGER NOT NULL,
-FOREIGN KEY (order_id) REFERENCES orders(order_id)
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
 );
